@@ -23,6 +23,8 @@ jobs:
       - uses: hacs/action@main
         with:
           category: integration
-          # 'brands' requires a merged PR to home-assistant/brands (only needed
-          # for HACS default-store inclusion, not for custom-repo installation).
+          # Brand icons are bundled in custom_components/atomberg_local/brand/;
+          # HA 2026.3+ serves them via the local brands-proxy API. The
+          # home-assistant/brands repo no longer accepts custom-integration icons,
+          # so HACS's (repo-based) brands check is skipped.
           ignore: brands
