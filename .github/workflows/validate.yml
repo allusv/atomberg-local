@@ -23,3 +23,6 @@ jobs:
       - uses: hacs/action@main
         with:
           category: integration
+          # 'brands' requires a merged PR to home-assistant/brands (only needed
+          # for HACS default-store inclusion, not for custom-repo installation).
+          ignore: brands
