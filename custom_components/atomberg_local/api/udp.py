@@ -59,10 +59,20 @@ class UdpListener(asyncio.DatagramProtocol):
         self._transport = transport
 
     def datagram_received(self, data: bytes, addr: tuple[str, int]) -> None:
-        parsed = parse_datagram(data, addr[0])
+        try:
+            parsed = parse_datagram(data, addr[0])
+        except Exception as err:  # noqa: BLE001 - a malformed packet must not kill the listener
+            _LOGGER.debug("Ignored malformed :5625 datagram from %s: %s", addr[0], err)
+            return
         if parsed:
             device_id, series, state = parsed
+            _LOGGER.debug(
+                "Wi-Fi sighting: %s from %s (series=%s, has_state=%s)",
+                device_id, addr[0], series, state is not None,
+            )
             self._on_update(device_id, addr[0], series, state)
+        else:
+            _LOGGER.debug("Unparsed :5625 datagram from %s: %r", addr[0], data[:48])
 
     def error_received(self, exc: Exception) -> None:  # pragma: no cover
         _LOGGER.debug("UDP error: %s", exc)

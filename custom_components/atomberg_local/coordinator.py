@@ -40,6 +40,7 @@ class AtombergCoordinator(DataUpdateCoordinator):
     async def async_setup(self) -> None:
         """Start the Wi-Fi listener (BLE comes from HA's Bluetooth stack)."""
         self._udp_transport = await start_listener(self.manager.handle_wifi_update)
+        _LOGGER.debug("Atomberg UDP listener started on :5625")
 
     async def async_shutdown(self) -> None:
         if self._udp_transport:
@@ -55,8 +56,18 @@ class AtombergCoordinator(DataUpdateCoordinator):
         self.async_update_listeners()
 
     def _ingest_ble(self) -> None:
-        """Feed current HA-discovered BLE adverts into the manager."""
-        for info in bluetooth.async_discovered_service_info(self.hass, connectable=True):
+        """Feed current HA-discovered BLE adverts into the manager.
+
+        Never raises: Bluetooth may not be set up yet (or at all), and that must
+        not abort setup — Wi-Fi discovery still works without it.
+        """
+        try:
+            infos = list(bluetooth.async_discovered_service_info(self.hass, connectable=True))
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.debug("Bluetooth not ready, skipping BLE ingest: %s", err)
+            return
+        matched = 0
+        for info in infos:
             parsed = parse_ble_name(info.name)
             if not parsed:
                 continue
@@ -65,11 +76,18 @@ class AtombergCoordinator(DataUpdateCoordinator):
                 self.hass, info.address, connectable=True
             )
             if ble_device:
+                matched += 1
                 self.manager.handle_ble_advert(device_id, series, ble_device, info.rssi)
+        _LOGGER.debug(
+            "BLE ingest: %d Atomberg fan(s) among %d discovered device(s)", matched, len(infos)
+        )
 
     async def _async_update_data(self) -> dict:
-        # 1) refresh BLE presence from HA's central scanner
-        self._ingest_ble()
+        # 1) refresh BLE presence from HA's central scanner (must never fail setup)
+        try:
+            self._ingest_ble()
+        except Exception as err:  # noqa: BLE001
+            _LOGGER.debug("BLE ingest failed: %s", err)
         # 2) ask fans for current state (cheap Wi-Fi read; BLE read for BLE-only)
         for device in list(self.manager.devices.values()):
             try:
@@ -78,4 +96,5 @@ class AtombergCoordinator(DataUpdateCoordinator):
                 pass
             except Exception:  # noqa: BLE001
                 pass
+        _LOGGER.debug("Coordinator refresh: %d fan(s) known", len(self.manager.devices))
         return self.manager.devices
