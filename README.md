@@ -27,12 +27,17 @@ Atomberg's own app and the official integration route every command through Atom
 ### HACS (recommended)
 
 1. HACS → **⋮** → **Custom repositories** → add `https://github.com/allusv/atomberg-local` as an **Integration**.
-2. Install **Atomberg Local**, then restart Home Assistant.
-3. **Settings → Devices & Services → Add Integration → Atomberg Local**.
+2. Open the **Atomberg Local** card, click **Download**, then **restart Home Assistant**.
+3. **⚠️ This last step is required — downloading in HACS does *not* add the integration.**
+   Go to **Settings → Devices & Services → ➕ Add Integration**, search **Atomberg Local**, and add it.
+4. Your fans are discovered automatically. No IP addresses or configuration needed.
+
+> **If you skip step 3 you'll see no devices and no entities** — HACS only copies the files; Home Assistant still needs you to *add* the integration so it starts the discovery listener.
 
 ### Manual
 
-Copy `custom_components/atomberg_local` into your Home Assistant `config/custom_components/` folder and restart.
+1. Copy `custom_components/atomberg_local` into your Home Assistant `config/custom_components/` folder and **restart**.
+2. Then do step 3 above: **Settings → Devices & Services → ➕ Add Integration → Atomberg Local**.
 
 ## How it works
 
@@ -61,6 +66,24 @@ Any Atomberg smart fan that announces itself locally. Model names are inferred f
 - **Onboarding a brand-new fan to Wi-Fi** still uses the Atomberg app (the credential exchange is encrypted). Once provisioned, everything here is local. Bluetooth-only control works without provisioning.
 - Model detection is series-based and approximate.
 - Local state exposes power/speed/sleep/timer/LED/brightness/colour; some raw telemetry fields are not decoded.
+
+## Troubleshooting
+
+**"No devices detected" / no entities after installing.**
+The usual cause: the integration was **downloaded in HACS but never added**. Go to **Settings → Devices & Services → ➕ Add Integration → Atomberg Local** (see step 3 above). Then give it a few seconds — Wi-Fi fans announce themselves on your LAN and appear automatically.
+
+Still nothing? Check:
+- Home Assistant is on the **same subnet** as the fan, and **UDP 5600/5625** aren't blocked (VLANs/guest networks often block broadcast).
+- A **Bluetooth adapter** is set up in HA if you're relying on Bluetooth-only (un-provisioned) fans.
+- Enable debug logging to see discovery activity: add to `configuration.yaml` →
+  ```yaml
+  logger:
+    logs:
+      custom_components.atomberg_local: debug
+  ```
+
+**The icon shows as "image not available" in the HACS store panel.**
+This is a [known HACS limitation](https://github.com/hacs/integration/issues/5223), not a problem with this integration. Since HA 2026.3, custom integrations ship their brand icons inside the integration (this one does, under `custom_components/atomberg_local/brand/`), and the HACS store panel hasn't yet been updated to read them — it still queries the public brands CDN, which doesn't host custom-integration icons. **The icon displays correctly once installed**, on the Integrations page and on each device. Nothing to fix here.
 
 ## Disclaimer
 
