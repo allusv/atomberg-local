@@ -1,0 +1,37 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Atomberg Local",
+        "description": "Found {count} fan(s) on Wi-Fi. Bluetooth-only (un-provisioned) fans are discovered automatically. Set up Atomberg Local?"
+      }
+    },
+    "abort": {
+      "already_configured": "Atomberg Local is already configured."
+    }
+  },
+  "entity": {
+    "switch": {
+      "sleep": { "name": "Sleep mode" },
+      "boost": { "name": "Boost" },
+      "prefer_ble": { "name": "Prefer Bluetooth" }
+    },
+    "light": {
+      "led": { "name": "LED" }
+    },
+    "number": {
+      "timer": { "name": "Timer" }
+    },
+    "sensor": {
+      "connection": {
+        "name": "Connection",
+        "state": {
+          "wifi": "Wi-Fi",
+          "ble": "Bluetooth",
+          "offline": "Offline"
+        }
+      },
+      "ble_rssi": { "name": "BLE signal" }
+    }
+  }
+}

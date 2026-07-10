@@ -1,0 +1,70 @@
+# Atomberg Local
+
+Local control for **Atomberg smart BLDC fans** in Home Assistant — over **Wi-Fi and Bluetooth**, with **no cloud, no account, and no internet required**.
+
+[![hacs][hacs-badge]][hacs] [![Validate](https://github.com/allusv/atomberg-local/actions/workflows/validate.yml/badge.svg)](https://github.com/allusv/atomberg-local/actions/workflows/validate.yml)
+
+Atomberg's own app and the official integration route every command through Atomberg's cloud. **Atomberg Local** talks to the fan directly on your LAN (UDP) and over Bluetooth LE — commands never leave your network.
+
+## Features
+
+- 🔍 **Discovers every fan** on your network **and** over Bluetooth — and tells you which are **provisioned** (on Wi-Fi) vs **un-provisioned** (Bluetooth-only, not yet set up).
+- 📶 **Wi-Fi + Bluetooth, automatically.** Provisioned fans are controlled over Wi-Fi (fast, push state). Fans not on Wi-Fi are controlled over **Bluetooth** — no setup required.
+- 🔁 **Automatic fallback.** If a fan's Wi-Fi is weak, disconnected, or a command isn't confirmed, it **falls back to Bluetooth** transparently.
+- 🧩 **Self-reconciling.** A fan first seen over Bluetooth and later provisioned onto Wi-Fi is recognised as the **same device** (keyed by its `device_id`) — no duplicates, it just gains Wi-Fi.
+- 🏷️ **Model recognition** from the fan's series code (e.g. `S2 → Renesa Elite`).
+- 🎛️ **Full control:** power, speed (1–6), sleep mode, boost (where supported), off-timer, and the LED light (on/off, brightness, and cool/warm/daylight where supported).
+- ☁️ **100% local** — verified with all cloud/proxy tooling switched off.
+
+## Requirements
+
+- Home Assistant **2024.8** or newer.
+- A **Bluetooth adapter** configured in Home Assistant (for BLE discovery, fallback, and Bluetooth-only fans). Wi-Fi-only use works without one.
+- Home Assistant on the **same subnet** as your fans, with **UDP ports 5600 and 5625** not blocked (used for local control and state).
+
+## Installation
+
+### HACS (recommended)
+
+1. HACS → **⋮** → **Custom repositories** → add `https://github.com/allusv/atomberg-local` as an **Integration**.
+2. Install **Atomberg Local**, then restart Home Assistant.
+3. **Settings → Devices & Services → Add Integration → Atomberg Local**.
+
+### Manual
+
+Copy `custom_components/atomberg_local` into your Home Assistant `config/custom_components/` folder and restart.
+
+## How it works
+
+| | Wi-Fi (UDP) | Bluetooth (GATT) |
+|---|---|---|
+| **Commands** | JSON datagram → fan `:5600` | same JSON → command characteristic |
+| **State** | fan broadcasts on `:5625` (push) | read from the state characteristic |
+| **Works when** | fan is provisioned & on your LAN | always in BLE range (even un-provisioned) |
+
+Each fan is identified by its stable `device_id` (its Wi-Fi MAC), which both transports expose — so Home Assistant always sees one device per fan regardless of how it's reached. Set the per-fan **“Prefer Bluetooth”** switch to force BLE-only control.
+
+## Entities per fan
+
+- **Fan** — power + speed (1–6)
+- **Light** — LED (on/off; brightness and colour-temperature on models that support it)
+- **Switch** — Sleep mode, Boost (where supported), Prefer Bluetooth
+- **Number** — Timer (0–4 h)
+- **Sensor** — Connection (Wi-Fi / Bluetooth / Offline) and BLE signal (diagnostic)
+
+## Supported models
+
+Any Atomberg smart fan that announces itself locally. Model names are inferred from the **series code** and are best-effort — see [`models.py`](custom_components/atomberg_local/api/models.py). Confirmed: `S2` (Renesa Elite). Please open a PR to refine the mapping for your model.
+
+## Limitations
+
+- **Onboarding a brand-new fan to Wi-Fi** still uses the Atomberg app (the credential exchange is encrypted). Once provisioned, everything here is local. Bluetooth-only control works without provisioning.
+- Model detection is series-based and approximate.
+- Local state exposes power/speed/sleep/timer/LED/brightness/colour; some raw telemetry fields are not decoded.
+
+## Disclaimer
+
+Not affiliated with or endorsed by Atomberg. Trademarks belong to their owners. Use at your own risk.
+
+[hacs]: https://github.com/hacs/integration
+[hacs-badge]: https://img.shields.io/badge/HACS-Custom-41BDF5.svg
