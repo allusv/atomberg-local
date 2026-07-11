@@ -1,17 +1,23 @@
-"""Best-effort Atomberg fan model recognition from the series code.
+"""Best-effort Atomberg fan model recognition + capability profiles.
 
-The fan announces only a *series* code (e.g. ``S2``, ``R2``) locally - both in
-its BLE advertised name (``atomberg_S2_<id>_3``) and in field 7 of the state
-string. A series maps to a product family rather than a single SKU, so this is
-a friendly, easily-extended best guess plus a capability profile that drives
-which Home Assistant entities we expose.
+Locally a fan announces only a *series* code (e.g. ``S2``, ``I2``) in its BLE
+advertised name (``atomberg_S2_<id>_3``) and in field 7 of its state string. A
+series maps to a product family rather than a single SKU, so the friendly name
+is a best guess.
 
-Contributions welcome: refine a mapping and open a PR.
+The capability flags, however, decide which Home Assistant entities we expose,
+so they are kept accurate. Which series have a dimmable underlight and which
+have colour modes is cross-checked against Atomberg's own cloud integration
+(github.com/dasshubham762/atomberg-integration), extended across each product
+family. Getting these right matters: advertising a control the fan doesn't have
+just gives the user a slider that does nothing.
+
+Contributions welcome: refine a mapping for your model and open a PR.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
@@ -21,44 +27,47 @@ class ModelProfile:
     name: str
     family: str
     # capability flags -> drive entity creation
-    has_light: bool = True          # LED on/off
+    has_light: bool = True          # LED underlight (at least on/off)
     has_brightness: bool = False    # dimmable underlight
-    has_color: bool = False         # cool/warm/daylight
+    has_color: bool = False         # warm/cool/daylight modes
     has_sleep: bool = True
-    has_boost: bool = False
     has_timer: bool = True
+    has_boost: bool = False
     max_speed: int = 6
-    aliases: tuple[str, ...] = field(default_factory=tuple)
 
 
-# Series prefix / exact code -> profile. Exact code wins over prefix.
-_SERIES: dict[str, ModelProfile] = {
-    # Renesa / Studio family (R*, S*) - smart BLDC ceiling fans. The LED is a
-    # white underlight (dimmable on some models); these series have no colour
-    # modes (only the decorative Aris/I* family does).
-    "R1": ModelProfile("Renesa", "Renesa"),
-    "R2": ModelProfile("Renesa+", "Renesa"),
-    "R3": ModelProfile("Renesa Elite", "Renesa"),
-    "S1": ModelProfile("Studio+", "Studio", has_brightness=True),
-    "S2": ModelProfile("Renesa Elite", "Renesa", has_brightness=True),
-    # Aris family (I*) - decorative with underlight.
-    "I1": ModelProfile("Aris", "Aris", has_brightness=True, has_color=True),
-    "I2": ModelProfile("Aris Starlight", "Aris", has_brightness=True, has_color=True),
-    "I3": ModelProfile("Aris", "Aris", has_brightness=True, has_color=True),
-    "I4": ModelProfile("Aris", "Aris", has_brightness=True, has_color=True),
-    "I5": ModelProfile("Aris", "Aris", has_brightness=True, has_color=True),
-    # Efficio / Gorilla (M*, K*) - value BLDC, usually no light.
-    "M1": ModelProfile("Efficio", "Efficio", has_light=False),
-    "M2": ModelProfile("Efficio+", "Efficio", has_light=False),
-    "K1": ModelProfile("Gorilla", "Gorilla", has_light=False),
+# series code -> (friendly name, product family). Best-effort names.
+_NAMES: dict[str, tuple[str, str]] = {
+    "R1": ("Renesa", "Renesa"),
+    "R2": ("Renesa+", "Renesa"),
+    "R3": ("Renesa Smart+", "Renesa"),
+    "S1": ("Studio+", "Studio"),
+    "S2": ("Renesa Elite", "Renesa"),
+    "I1": ("Aris", "Aris"),
+    "I2": ("Aris Starlight", "Aris"),
+    "I3": ("Aris Star", "Aris"),
+    "I4": ("Aris", "Aris"),
+    "I5": ("Aris Contours", "Aris"),
+    "M1": ("Efficio", "Efficio"),
+    "M2": ("Efficio+", "Efficio"),
+    "K1": ("Gorilla", "Gorilla"),
 }
 
-_PREFIX = {
-    "R": ModelProfile("Renesa", "Renesa"),
-    "S": ModelProfile("Renesa", "Renesa"),
-    "I": ModelProfile("Aris", "Aris", has_brightness=True, has_color=True),
-    "M": ModelProfile("Efficio", "Efficio", has_light=False),
-    "K": ModelProfile("Gorilla", "Gorilla", has_light=False),
+# Dimmable white underlight. Validated for I1/I5/M1/S1/S2 by the cloud
+# integration; extended across the decorative Aris (I*) family.
+_BRIGHTNESS: set[str] = {"I1", "I2", "I3", "I4", "I5", "M1", "S1", "S2"}
+# Warm/cool/daylight colour modes: the decorative Aris (I*) underlight family.
+_COLOR: set[str] = {"I1", "I2", "I3", "I4", "I5"}
+# Series whose fans have no LED at all (control power/speed/sleep/timer only).
+_NO_LIGHT: set[str] = {"K1"}  # Gorilla
+
+# First-letter -> family, for unknown exact codes within a known family.
+_FAMILY_PREFIX = {
+    "R": "Renesa",
+    "S": "Studio",
+    "I": "Aris",
+    "M": "Efficio",
+    "K": "Gorilla",
 }
 
 
@@ -66,14 +75,21 @@ def profile_for_series(series: str | None) -> ModelProfile:
     """Return a capability profile for a series code, with sensible fallbacks."""
     if not series:
         return ModelProfile("Atomberg Fan", "Atomberg")
-    series = series.strip().upper()
-    if series in _SERIES:
-        return _SERIES[series]
-    prof = _PREFIX.get(series[:1])
-    if prof:
-        # Unknown exact code within a known family: keep the family, label with series.
-        return ModelProfile(f"Atomberg {prof.family} ({series})", prof.family,
-                            has_light=prof.has_light, has_brightness=prof.has_brightness,
-                            has_color=prof.has_color, has_boost=prof.has_boost,
-                            max_speed=prof.max_speed)
-    return ModelProfile(f"Atomberg Fan ({series})", "Atomberg")
+    s = series.strip().upper()
+    known = s in _NAMES
+    if known:
+        name, family = _NAMES[s]
+    else:
+        family = _FAMILY_PREFIX.get(s[:1], "Atomberg")
+        name = (
+            f"Atomberg {family} ({s})" if family != "Atomberg" else f"Atomberg Fan ({s})"
+        )
+    # Unknown codes inherit capabilities from their family (Aris = lit + colour).
+    is_aris = s[:1] == "I"
+    return ModelProfile(
+        name=name,
+        family=family,
+        has_light=s not in _NO_LIGHT,
+        has_brightness=(s in _BRIGHTNESS) or (not known and is_aris),
+        has_color=(s in _COLOR) or (not known and is_aris),
+    )

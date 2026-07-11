@@ -13,7 +13,7 @@ Atomberg's own app and the official integration route every command through Atom
 - 🔁 **Automatic fallback.** If a fan's Wi-Fi is weak, disconnected, or a command isn't confirmed, it **falls back to Bluetooth** transparently.
 - 🧩 **Self-reconciling.** A fan first seen over Bluetooth and later provisioned onto Wi-Fi is recognised as the **same device** (keyed by its `device_id`) — no duplicates, it just gains Wi-Fi.
 - 🏷️ **Model recognition** from the fan's series code (e.g. `S2 → Renesa Elite`).
-- 🎛️ **Full control:** power, speed (1–6), sleep mode, boost (where supported), off-timer, and the LED light (on/off, brightness, and cool/warm/daylight where supported).
+- 🎛️ **Full control:** power, speed (1–6), sleep mode, off-timer (Off / 1 / 2 / 3 / 6 h), and the LED underlight (on/off, brightness, and warm/cool/daylight — where the model supports them).
 - ☁️ **100% local** — verified with all cloud/proxy tooling switched off.
 
 ## Requirements
@@ -52,14 +52,30 @@ Each fan is identified by its stable `device_id` (its Wi-Fi MAC), which both tra
 ## Entities per fan
 
 - **Fan** — power + speed (1–6)
-- **Light** — LED (on/off; brightness and colour-temperature on models that support it)
-- **Switch** — Sleep mode, Boost (where supported), Prefer Bluetooth
-- **Number** — Timer (0–4 h)
+- **Light** — LED underlight: on/off on all lit models, **brightness** on dimmable models, and **warm / cool / daylight** as selectable *effects* on the decorative Aris models
+- **Switch** — Sleep mode, Prefer Bluetooth
+- **Select** — Timer (Off / 1 / 2 / 3 / 6 hours)
 - **Sensor** — Connection (Wi-Fi / Bluetooth / Offline) and BLE signal (diagnostic)
+
+Which light controls appear depends on the fan model (below).
 
 ## Supported models
 
-Any Atomberg smart fan that announces itself locally. Model names are inferred from the **series code** and are best-effort — see [`models.py`](custom_components/atomberg_local/api/models.py). Confirmed: `S2` (Renesa Elite). Please open a PR to refine the mapping for your model.
+Works with any Atomberg smart fan that announces itself on your network or over Bluetooth. The **series code** (part of the fan's local name, e.g. `atomberg_S2_…`) maps to a friendly name and a **capability profile** that decides which controls appear — so a fan only shows brightness/colour if that model actually has them. Names are best-effort; capabilities are cross-checked against Atomberg's cloud integration and extended across each product family — see [`models.py`](custom_components/atomberg_local/api/models.py).
+
+| Series | Model (approx.) | Speed | LED on/off | Brightness | Colour modes |
+|:---:|---|:---:|:---:|:---:|:---:|
+| `R1` | Renesa | ✅ | ✅ | – | – |
+| `R2` | Renesa+ | ✅ | ✅ | – | – |
+| `R3` | Renesa Smart+ | ✅ | ✅ | – | – |
+| `S1` | Studio+ | ✅ | ✅ | ✅ | – |
+| `S2` | Renesa Elite | ✅ | ✅ | ✅ | – |
+| `I1`–`I5` | Aris / Aris Starlight | ✅ | ✅ | ✅ | ✅ |
+| `M1` | Efficio | ✅ | ✅ | ✅ | – |
+| `M2` | Efficio+ | ✅ | ✅ | – | – |
+| `K1` | Gorilla | ✅ | – | – | – |
+
+Unknown series still work (power/speed/sleep/timer, plus an on/off light), and an unrecognised `I…` code is assumed to be an Aris with brightness + colour. Only **`S2` (Renesa Elite)** is hardware-verified so far — if your fan is mis-detected or a control is missing or non-functional, please open an issue with your series code; refining the table is a one-line change.
 
 ## Limitations
 

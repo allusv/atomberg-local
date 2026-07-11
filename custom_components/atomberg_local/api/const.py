@@ -41,7 +41,8 @@ READ_COMMAND = {"read": 1}   # no-op query: fan replies with current state
 
 MIN_SPEED = 1
 MAX_SPEED = 6
-MAX_TIMER_HOURS = 4          # 0-4 hours
+# The timer command takes an option index 0-4, mapping to Off/1h/2h/3h/6h.
+MAX_TIMER_INDEX = 4
 
 LIGHT_MODE_COOL = "cool"
 LIGHT_MODE_WARM = "warm"

@@ -8,7 +8,7 @@ PLATFORMS = [
     Platform.FAN,
     Platform.LIGHT,
     Platform.SWITCH,
-    Platform.NUMBER,
+    Platform.SELECT,
     Platform.SENSOR,
 ]
 

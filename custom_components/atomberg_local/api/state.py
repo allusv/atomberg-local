@@ -21,7 +21,7 @@ from .const import (
     LIGHT_MODE_DAYLIGHT,
     LIGHT_MODE_WARM,
     MAX_SPEED,
-    MAX_TIMER_HOURS,
+    MAX_TIMER_INDEX,
     MIN_SPEED,
 )
 
@@ -97,8 +97,8 @@ def build_command(**kwargs) -> dict:
                 raise ValueError(f"speed must be {MIN_SPEED}-{MAX_SPEED}")
         elif key == ATTR_TIMER:
             val = int(val)
-            if not 0 <= val <= MAX_TIMER_HOURS:
-                raise ValueError(f"timer must be 0-{MAX_TIMER_HOURS}")
+            if not 0 <= val <= MAX_TIMER_INDEX:
+                raise ValueError(f"timer index must be 0-{MAX_TIMER_INDEX}")
         elif key in (ATTR_POWER, ATTR_SLEEP, ATTR_LED, "boost"):
             val = bool(val)
         elif key == ATTR_LIGHT_MODE:
