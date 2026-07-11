@@ -33,12 +33,14 @@ class ModelProfile:
 
 # Series prefix / exact code -> profile. Exact code wins over prefix.
 _SERIES: dict[str, ModelProfile] = {
-    # Renesa family (R*, S*) - smart BLDC ceiling fans with LED indicator.
+    # Renesa / Studio family (R*, S*) - smart BLDC ceiling fans. The LED is a
+    # white underlight (dimmable on some models); these series have no colour
+    # modes (only the decorative Aris/I* family does).
     "R1": ModelProfile("Renesa", "Renesa"),
-    "R2": ModelProfile("Renesa+", "Renesa", has_brightness=True, has_color=True),
-    "R3": ModelProfile("Renesa Elite", "Renesa", has_brightness=True, has_color=True),
-    "S1": ModelProfile("Studio+", "Studio"),
-    "S2": ModelProfile("Renesa Elite", "Renesa", has_brightness=True, has_color=True),
+    "R2": ModelProfile("Renesa+", "Renesa"),
+    "R3": ModelProfile("Renesa Elite", "Renesa"),
+    "S1": ModelProfile("Studio+", "Studio", has_brightness=True),
+    "S2": ModelProfile("Renesa Elite", "Renesa", has_brightness=True),
     # Aris family (I*) - decorative with underlight.
     "I1": ModelProfile("Aris", "Aris", has_brightness=True, has_color=True),
     "I2": ModelProfile("Aris Starlight", "Aris", has_brightness=True, has_color=True),
