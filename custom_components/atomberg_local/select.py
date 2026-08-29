@@ -17,16 +17,19 @@ from .api import build_command
 from .coordinator import AtombergCoordinator
 from .entity import AtombergEntity, setup_atomberg_platform
 
-# (label, timer-hours as reported in state). The command value is the index.
+# (option key, timer-hours as reported in state). The command value sent to the
+# fan is the option's index in this list (0-4). Option keys are machine values;
+# their display text comes from strings.json/translations so the entity (name
+# and the five option labels) is translatable, per HA's SelectEntity convention.
 TIMER_OPTIONS: list[tuple[str, int]] = [
-    ("Off", 0),
-    ("1 hour", 1),
-    ("2 hours", 2),
-    ("3 hours", 3),
-    ("6 hours", 6),
+    ("off", 0),
+    ("1h", 1),
+    ("2h", 2),
+    ("3h", 3),
+    ("6h", 6),
 ]
-_LABELS = [label for label, _ in TIMER_OPTIONS]
-_HOURS_TO_LABEL = {hours: label for label, hours in TIMER_OPTIONS}
+_KEYS = [key for key, _ in TIMER_OPTIONS]
+_HOURS_TO_KEY = {hours: key for key, hours in TIMER_OPTIONS}
 
 
 async def async_setup_entry(
@@ -41,13 +44,17 @@ async def async_setup_entry(
 
 
 class AtombergTimerSelect(AtombergEntity, SelectEntity):
-    """Auto-off timer as a discrete select."""
+    """Auto-off timer as a discrete select.
 
-    _attr_name = "Timer"
+    No `_attr_name` here: leaving it unset lets Home Assistant derive both the
+    entity name and the five option labels from `_attr_translation_key` via
+    strings.json/translations (entity.select.timer.name / .state.*).
+    """
+
     _attr_translation_key = "timer"
     _attr_icon = "mdi:timer-outline"
     _attr_entity_category = EntityCategory.CONFIG
-    _attr_options = _LABELS
+    _attr_options = _KEYS
 
     def __init__(self, coordinator: AtombergCoordinator, device_id: str) -> None:
         super().__init__(coordinator, device_id)
@@ -58,9 +65,9 @@ class AtombergTimerSelect(AtombergEntity, SelectEntity):
         if not self.device.state:
             return None
         # Reported hours may be a countdown value outside the set — treat as unknown.
-        return _HOURS_TO_LABEL.get(self.device.state.timer_hours)
+        return _HOURS_TO_KEY.get(self.device.state.timer_hours)
 
     async def async_select_option(self, option: str) -> None:
-        index = _LABELS.index(option)  # command value is the option index (0-4)
+        index = _KEYS.index(option)  # command value is the option index (0-4)
         await self.device.async_send(build_command(timer=index))
         self.async_write_ha_state()

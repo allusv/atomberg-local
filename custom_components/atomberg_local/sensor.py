@@ -31,7 +31,6 @@ async def async_setup_entry(
 class AtombergConnectionSensor(AtombergEntity, SensorEntity):
     """Active control transport: wifi / ble / offline."""
 
-    _attr_name = "Connection"
     _attr_translation_key = "connection"
     _attr_icon = "mdi:transit-connection-variant"
     _attr_entity_category = EntityCategory.DIAGNOSTIC
@@ -64,7 +63,6 @@ class AtombergConnectionSensor(AtombergEntity, SensorEntity):
 class AtombergRssiSensor(AtombergEntity, SensorEntity):
     """BLE signal strength."""
 
-    _attr_name = "BLE signal"
     _attr_translation_key = "ble_rssi"
     _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_device_class = SensorDeviceClass.SIGNAL_STRENGTH

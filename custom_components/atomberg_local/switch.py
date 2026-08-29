@@ -32,7 +32,6 @@ async def async_setup_entry(
 class AtombergSleepSwitch(AtombergEntity, SwitchEntity):
     """Sleep mode (gradually steps speed down)."""
 
-    _attr_name = "Sleep mode"
     _attr_translation_key = "sleep"
     _attr_icon = "mdi:power-sleep"
 
@@ -56,7 +55,6 @@ class AtombergSleepSwitch(AtombergEntity, SwitchEntity):
 class AtombergBoostSwitch(AtombergEntity, SwitchEntity):
     """Boost / turbo mode."""
 
-    _attr_name = "Boost"
     _attr_translation_key = "boost"
     _attr_icon = "mdi:fan-plus"
 
@@ -81,7 +79,6 @@ class AtombergBoostSwitch(AtombergEntity, SwitchEntity):
 class AtombergPreferBleSwitch(AtombergEntity, SwitchEntity):
     """When on, control this fan over BLE only (ignores Wi-Fi)."""
 
-    _attr_name = "Prefer Bluetooth"
     _attr_translation_key = "prefer_ble"
     _attr_icon = "mdi:bluetooth"
     _attr_entity_category = EntityCategory.CONFIG

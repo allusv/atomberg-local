@@ -51,7 +51,6 @@ class AtombergLight(AtombergEntity, LightEntity):
     """The fan's LED light."""
 
     _attr_translation_key = "led"
-    _attr_name = "LED"
 
     def __init__(self, coordinator: AtombergCoordinator, device_id: str) -> None:
         super().__init__(coordinator, device_id)
