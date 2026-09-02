@@ -65,7 +65,7 @@ class AtombergFan(AtombergEntity, FanEntity):
         else:
             speed = round(percentage_to_ranged_value(self._speed_range, percentage))
             speed = max(MIN_SPEED, min(MAX_SPEED, speed))
-            await self.device.async_send(build_command(power=True, speed=speed))
+            await self.device.async_send(build_command(speed=speed))
         self.async_write_ha_state()
 
     async def async_turn_on(

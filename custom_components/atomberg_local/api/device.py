@@ -111,6 +111,14 @@ class AtombergDevice:
         for k, v in command.items():
             if hasattr(s, k):
                 setattr(s, k, v)
+        if "speed" in command and command["speed"] > 0:
+            s.power = True
+        if "power" in command and not command["power"]:
+            s.power = False
+        if "brightness" in command and command["brightness"] > 0:
+            s.led = True
+        if "light_mode" in command:
+            s.led = True
 
     # ---- control with fallback ----
     async def async_send(self, command: dict, verify: bool = True) -> str:
@@ -121,41 +129,70 @@ class AtombergDevice:
             if transport == "wifi" and self.wifi_available:
                 try:
                     self._state_event.clear()
-                    await asyncio.get_running_loop().run_in_executor(
+                    _LOGGER.info(
+                        "[%s] Sending Wi-Fi command to %s:5600: %s",
+                        self.device_id, self.wifi_ip, command
+                    )
+                    direct_state = await asyncio.get_running_loop().run_in_executor(
                         None, udp_mod.send_command, self.wifi_ip, command
                     )
                     self._apply_optimistic(command)
+                    if direct_state is not None:
+                        _LOGGER.info(
+                            "[%s] Wi-Fi command confirmed via direct UDP response (speed=%s, power=%s)",
+                            self.device_id, direct_state.speed, direct_state.power
+                        )
+                        self.update_wifi(self.wifi_ip, direct_state.series or self.series, direct_state)
+                        return "wifi"
+
                     if not verify:
                         return "wifi"
-                    # The fan broadcasts fresh state after accepting a command.
+
                     try:
                         await asyncio.wait_for(self._state_event.wait(), timeout=1.5)
+                        _LOGGER.info(
+                            "[%s] Wi-Fi command confirmed via :5625 broadcast (speed=%s, power=%s)",
+                            self.device_id,
+                            self.state.speed if self.state else None,
+                            self.state.power if self.state else None,
+                        )
                         return "wifi"
                     except asyncio.TimeoutError:
-                        _LOGGER.debug("%s: Wi-Fi command unconfirmed, falling back", self.device_id)
+                        _LOGGER.warning(
+                            "[%s] Wi-Fi command unconfirmed after 1.5s, falling back to BLE", self.device_id
+                        )
                 except OSError as err:
                     last_err = err
+                    _LOGGER.warning("[%s] Wi-Fi command failed with socket error: %s", self.device_id, err)
             elif transport == "ble" and self.ble_available:
                 try:
+                    _LOGGER.info("[%s] Sending BLE command: %s", self.device_id, command)
                     async with ble_mod.BleTransport(self.ble_device) as bt:
                         await bt.send_command(command)
                         state = await bt.read_state()
                     if state is not None:
                         self.state = state
+                        _LOGGER.info(
+                            "[%s] BLE command confirmed (speed=%s, power=%s)",
+                            self.device_id, state.speed, state.power
+                        )
                     else:
                         self._apply_optimistic(command)
+                        _LOGGER.info("[%s] BLE command sent (optimistic state applied)", self.device_id)
                     return "ble"
                 except Exception as err:  # noqa: BLE001
                     last_err = err
-                    _LOGGER.debug("%s: BLE command failed: %s", self.device_id, err)
+                    _LOGGER.warning("[%s] BLE command failed: %s", self.device_id, err)
         raise NoTransportAvailable(str(last_err) if last_err else "no transport")
 
     async def async_refresh(self) -> None:
         """Ask the fan for its current state (Wi-Fi read command or BLE read)."""
         if self.wifi_available and not self.prefer_ble:
-            await asyncio.get_running_loop().run_in_executor(
+            direct_state = await asyncio.get_running_loop().run_in_executor(
                 None, udp_mod.send_command, self.wifi_ip, READ_COMMAND
             )
+            if direct_state is not None:
+                self.update_wifi(self.wifi_ip, direct_state.series or self.series, direct_state)
         elif self.ble_available:
             try:
                 async with ble_mod.BleTransport(self.ble_device) as bt:
