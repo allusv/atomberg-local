@@ -19,33 +19,75 @@ UpdateCallback = Callable[[str, str, "str | None", "FanState | None"], None]
 
 def parse_datagram(data: bytes, src_ip: str) -> tuple[str, str | None, FanState | None] | None:
     """Return (device_id, series, state) from a :5625 datagram, or None."""
-    msg = data.decode(errors="ignore")
+    msg = data.decode(errors="ignore").strip()
     if msg.startswith("PROXY "):
         parts = msg.split()
         if len(parts) >= 6 and parts[1] == "TCP4":
-            msg = " ".join(parts[6:])
-    # Full-state broadcast: hex-encoded JSON with a state_string.
-    try:
-        payload = json.loads(bytes.fromhex(msg))
-    except ValueError:
-        payload = None
+            msg = " ".join(parts[6:]).strip()
+
+    payload = None
+    if msg.startswith("{") and msg.endswith("}"):
+        try:
+            payload = json.loads(msg)
+        except (ValueError, TypeError):
+            payload = None
+
+    if payload is None:
+        try:
+            payload = json.loads(bytes.fromhex(msg))
+        except (ValueError, TypeError):
+            payload = None
+
     if isinstance(payload, dict) and "device_id" in payload:
         state = decode_state(payload["state_string"]) if "state_string" in payload else None
-        series = state.series if state else None
-        return payload["device_id"], series, state
-    # Presence beacon: "<device_id>_<series>".
-    if "_" in msg:
-        did, _, series = msg.partition("_")
-        if did:
-            return did, (series.split("_")[0] or None), None
+        series = state.series if state else payload.get("series")
+        return str(payload["device_id"]).lower(), series, state
+
+    # Presence beacon: "<device_id>_<series>"
+    if "_" in msg and not msg.startswith("{"):
+        did, _, series_part = msg.partition("_")
+        did = did.strip().lower()
+        if did and all(c in "0123456789abcdef" for c in did) and 8 <= len(did) <= 16:
+            series = series_part.split("_")[0].strip() if series_part else None
+            return did, series or None, None
+
     return None
 
 
-def send_command(ip: str, command: dict) -> None:
-    """Fire a JSON command datagram to the fan (:5600). Non-blocking."""
+def send_command(ip: str, command: dict, timeout: float = 0.4) -> FanState | None:
+    """Send JSON command datagram to :5600 and return direct state reply if present."""
     data = json.dumps(command).encode()
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
-        sock.sendto(data, (ip, CMD_PORT))
+        sock.settimeout(timeout)
+        try:
+            sock.sendto(data, (ip, CMD_PORT))
+        except OSError as err:
+            _LOGGER.debug("UDP send error to %s:%d: %s", ip, CMD_PORT, err)
+            raise
+
+        try:
+            resp_data, _ = sock.recvfrom(2048)
+            resp_msg = resp_data.decode(errors="ignore").strip()
+            state = None
+            if "," in resp_msg:
+                state = decode_state(resp_msg)
+            if state is None and resp_msg.startswith("{"):
+                try:
+                    payload = json.loads(resp_msg)
+                    if isinstance(payload, dict) and "state_string" in payload:
+                        state = decode_state(payload["state_string"])
+                except Exception:
+                    pass
+            if state is None:
+                try:
+                    payload = json.loads(bytes.fromhex(resp_msg))
+                    if isinstance(payload, dict) and "state_string" in payload:
+                        state = decode_state(payload["state_string"])
+                except Exception:
+                    pass
+            return state
+        except (socket.timeout, OSError):
+            return None
 
 
 class UdpListener(asyncio.DatagramProtocol):
