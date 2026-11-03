@@ -65,7 +65,14 @@ class AtombergFan(AtombergEntity, FanEntity):
         else:
             speed = round(percentage_to_ranged_value(self._speed_range, percentage))
             speed = max(MIN_SPEED, min(MAX_SPEED, speed))
-            await self.device.async_send(build_command(power=True, speed=speed))
+            # The fan ignores a command that carries both power and speed, so send
+            # them separately: power first (only if it is off), then speed alone.
+            was_off = not (self.device.state and self.device.state.power)
+            if was_off:
+                await self.device.async_send(build_command(power=True))
+            # Right after power-on the fan's confirming broadcast can arrive late;
+            # the packet is still delivered, so don't raise on a missing confirmation.
+            await self.device.async_send(build_command(speed=speed), verify=not was_off)
         self.async_write_ha_state()
 
     async def async_turn_on(
